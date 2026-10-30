@@ -7,7 +7,7 @@ import time
 import traceback
 
 # Must run before importing anything that reads API_HOST / ATHENA_HOST (e.g. registration below)
-from openpilot.sunnypilot.system.konik_api import apply_konik_env
+from openpilot.sunnypilot.system.konik_api import apply_konik_env, sync_konik_dongle_id
 apply_konik_env()
 
 from openpilot.cereal import log
@@ -84,6 +84,7 @@ def manager_init() -> None:
   params.put("HardwareSerial", serial, block=True)
 
   # set dongle id
+  sync_konik_dongle_id(params)
   reg_res = register(show_spinner=True)
   if reg_res:
     dongle_id = reg_res

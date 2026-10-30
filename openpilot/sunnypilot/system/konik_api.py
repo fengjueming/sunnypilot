@@ -76,18 +76,37 @@ def _write(name: str, value: str) -> None:
     f.write(value)
 
 
-def swap_dongle_for_konik(konik: bool, params) -> None:
-  """Stash the current DongleId, then load the saved DongleId if it exists.
-  If not, remove the DongleId to trigger registration with the respective API on next boot."""
+def _persisted_comma_dongle_id() -> str | None:
+  try:
+    with open("/persist/comma/dongle_id") as f:
+      return f.read().strip() or None
+  except OSError:
+    return None
+
+
+def sync_konik_dongle_id(params) -> None:
+  """Konik needs its own registration, but register() keeps comma's dongle id from /persist,
+  so register with Konik once and switch DongleId between the two backends' ids."""
+  from openpilot.system.athena.registration import register, UNREGISTERED_DONGLE_ID
+
   current = params.get("DongleId")
-  old_dongle_id = "KonikDongleId" if not konik else "CommaDongleId"
-  new_dongle_id = "CommaDongleId" if not konik else "KonikDongleId"
+  comma_dongle_id = _read("CommaDongleId") or _persisted_comma_dongle_id()
+  konik_dongle_id = _read("KonikDongleId")
+  if konik_dongle_id == comma_dongle_id:
+    konik_dongle_id = None  # stashed by an older version that never registered with Konik
 
-  if current:
-    _write(old_dongle_id, current)
-
-  saved = _read(new_dongle_id)
-  if saved:
-    params.put("DongleId", saved)
-  else:
-    params.remove("DongleId")
+  if konik_active():
+    if current not in (None, UNREGISTERED_DONGLE_ID, konik_dongle_id):
+      _write("CommaDongleId", current)
+    if konik_dongle_id is None:
+      new_dongle_id = register(show_spinner=True, register_konik=True)
+      if new_dongle_id not in (None, UNREGISTERED_DONGLE_ID):
+        konik_dongle_id = new_dongle_id
+        _write("KonikDongleId", konik_dongle_id)
+    if konik_dongle_id is not None and current != konik_dongle_id:
+      params.put("DongleId", konik_dongle_id, block=True)
+  elif konik_dongle_id is not None and current == konik_dongle_id:
+    if comma_dongle_id:
+      params.put("DongleId", comma_dongle_id, block=True)
+    else:
+      params.remove("DongleId")  # register() registers with comma again

@@ -7,7 +7,7 @@ from openpilot.system.ui.lib.application import gui_app
 from openpilot.selfdrive.ui.layouts.settings.common import restart_needed_callback
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.selfdrive.ui.widgets.ssh_key import SshKeyFetcher
-from openpilot.sunnypilot.system.konik_api import is_konik_enabled, set_konik_enabled, swap_dongle_for_konik
+from openpilot.sunnypilot.system.konik_api import is_konik_enabled, set_konik_enabled
 
 
 class AlphaLongConfirmPage(NavScroller):
@@ -214,8 +214,7 @@ class DeveloperLayoutMici(NavScroller):
 
   def _on_konik_toggled(self, state: bool):
     def do_toggle():
-      set_konik_enabled(state)
-      swap_dongle_for_konik(state, ui_state.params)
+      set_konik_enabled(state)  # manager switches the DongleId on the next boot
       ui_state.params.put_bool("DoReboot", True, block=True)
 
     # Don't show the new state until the reboot is confirmed
