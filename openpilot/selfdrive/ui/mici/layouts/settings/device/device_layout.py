@@ -7,7 +7,7 @@ from openpilot.common.basedir import BASEDIR
 from openpilot.common.params import Params
 from openpilot.common.time_helpers import system_time_valid
 from openpilot.selfdrive.ui.mici.layouts.settings.device.prime import PrimeScroller
-from openpilot.sunnypilot.system.konik_api import get_pairing_backend_name, get_pairing_host
+from openpilot.sunnypilot.system.konik_api import get_pairing_backend_name, get_pairing_host, konik_active
 from openpilot.system.ui.widgets.scroller import NavRawScrollPanel, NavScroller
 from openpilot.selfdrive.ui.mici.widgets.info import InfoLayoutMici
 from openpilot.selfdrive.ui.mici.widgets.button import BigButton, BigCircleButton
@@ -110,11 +110,13 @@ class PairBigButton(BigButton):
     super()._update_state()
 
     self._show_commacare = (ui_state.prime_state.is_paired() and ui_state.prime_state.is_prime()
-                            and ui_state.prime_state.has_commacare())
+                            and ui_state.prime_state.has_commacare() and not konik_active())
     if ui_state.prime_state.is_paired():
       self.set_icon(self._provider_icons.get(ui_state.prime_state.get_pairing_provider(), self._comma_icon))
       self.set_text("paired")
-      if ui_state.prime_state.is_prime():
+      if konik_active():
+        self.set_value(get_pairing_host())  # Konik has no prime
+      elif ui_state.prime_state.is_prime():
         self.set_value("prime" if ui_state.prime_state.is_full_prime() else "prime lite")
       else:
         self.set_value("claim prime trial" if ui_state.prime_state.can_claim_prime_trial() else "upgrade to prime")

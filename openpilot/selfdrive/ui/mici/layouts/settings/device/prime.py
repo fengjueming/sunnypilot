@@ -10,7 +10,7 @@ from openpilot.selfdrive.ui.mici.widgets.qr import QR
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.widgets.scroller import NavScroller
-from openpilot.sunnypilot.system.konik_api import get_pairing_host
+from openpilot.sunnypilot.system.konik_api import get_pairing_host, konik_active
 
 
 class PairingInfoLayout(InfoLayoutMici):
@@ -22,10 +22,14 @@ class PairingInfoLayout(InfoLayoutMici):
 
   def _update_state(self):
     super()._update_state()
-    self.subtext1.set_text(ui_state.prime_state.get_pairing_account())
-    self.subtext2.set_text(self._get_prime_status())
+    account = ui_state.prime_state.get_pairing_account()
+    # Konik has no prime and may not report the account owner
+    if konik_active() and account == "unknown":
+      account = "konik account"
+    self.subtext1.set_text(account)
+    self.subtext2.set_text("konik stable" if konik_active() else self._get_prime_status())
     self._provider_icon = self._provider_icons.get(ui_state.prime_state.get_pairing_provider())
-    self._show_commacare = ui_state.prime_state.has_commacare()
+    self._show_commacare = ui_state.prime_state.has_commacare() and not konik_active()
 
   @staticmethod
   def _get_prime_status() -> str:
@@ -96,6 +100,24 @@ class PrimeManagementScroller(NavScroller):
       self.dismiss()
 
 
+class KonikDeviceScroller(NavScroller):
+  """Link to the device on Konik Stable, which replaces prime management when using Konik."""
+
+  def __init__(self):
+    super().__init__()
+    dongle_id = Params().get("DongleId") or ""
+    self._scroller.add_widgets([
+      QR(f"https://{get_pairing_host()}/{dongle_id}"),
+      GreyBigButton("konik stable", "scan to open\nthis device",
+                    gui_app.texture("icons_mici/settings/device/phone.png", 85, 64)),
+    ])
+
+  def _update_state(self):
+    super()._update_state()
+    if not ui_state.prime_state.is_paired():
+      self.dismiss()
+
+
 class PrimeScroller(NavScroller):
   """Pairing flow or paired account information with access to prime management."""
 
@@ -108,12 +130,16 @@ class PrimeScroller(NavScroller):
     self._last_pairing_qr_generation = float("-inf")
 
     self._manage_icon = gui_app.texture("icons_mici/settings/comma_icon.png", 33, 60)
-    if not ui_state.prime_state.is_prime():
+    if konik_active():
+      self._manage_prime = BigButton("open konik", icon=self._manage_icon)
+      self._manage_prime.set_click_callback(lambda: gui_app.push_widget(KonikDeviceScroller()))
+    elif not ui_state.prime_state.is_prime():
       title = "claim\nprime trial" if ui_state.prime_state.can_claim_prime_trial() else "upgrade\nto prime"
       self._manage_prime = BigButton(title, icon=self._manage_icon)
     else:
       self._manage_prime = BigButton("manage prime", icon=self._manage_icon)
-    self._manage_prime.set_click_callback(lambda: gui_app.push_widget(PrimeManagementScroller()))
+    if not konik_active():
+      self._manage_prime.set_click_callback(lambda: gui_app.push_widget(PrimeManagementScroller()))
 
     if self.initial_is_paired:
       self._scroller.add_widgets([
