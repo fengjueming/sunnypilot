@@ -177,11 +177,38 @@ class Car:
 
     self.v_cruise_helper = VCruiseHelper(self.CP, self.CP_SP)
 
+    # Toyota dashboard follow distance -> personality sync
+    self.pcm_follow_distance_prev = None
+    self.op_distance_press_frames = 0
+
     self.is_metric = self.params.get_bool("IsMetric")
     self.initial_cruise_speed = self.params.get("InitialCruiseSpeedKph", return_default=True)
 
     # card is driven by can recv, expected at 100Hz
     self.rk = Ratekeeper(100, print_delay_threshold=None)
+
+  def sync_personality_from_pcm_follow_distance(self) -> None:
+    # Sync Toyota dashboard follow distance to the personality, only with openpilot longitudinal:
+    # 1: Far (3 bars) -> 2: Relaxed, 2: Med (2 bars) -> 1: Standard, 3: Close (1 bar) -> 0: Aggressive
+    if self.CP.brand != "toyota" or not self.CP.openpilotLongitudinalControl:
+      return
+
+    # openpilot presses the distance button itself to bring the bars in line with the personality.
+    # Ignore bar changes while it does (and for 1s after), or the intermediate bars would be written back.
+    if getattr(self.CI.CC, "distance_button", 0):
+      self.op_distance_press_frames = 100
+    elif self.op_distance_press_frames > 0:
+      self.op_distance_press_frames -= 1
+
+    pcm_follow_distance = int(getattr(self.CI.CS, "pcm_follow_distance", 0))
+    if pcm_follow_distance not in (1, 2, 3) or pcm_follow_distance == self.pcm_follow_distance_prev:
+      return
+
+    # The first reading is the car's power-on default, keep the saved personality instead
+    first_reading = self.pcm_follow_distance_prev is None
+    self.pcm_follow_distance_prev = pcm_follow_distance
+    if not first_reading and self.op_distance_press_frames == 0:
+      self.params.put("LongitudinalPersonality", 3 - pcm_follow_distance)
 
   def state_update(self) -> tuple[car.CarState, custom.CarStateSP, structs.RadarDataT | None]:
     """carState update loop, driven by can"""
@@ -192,6 +219,7 @@ class Car:
     # Update carState from CAN
     CS, CS_SP = self.CI.update(can_list)
     CS_SP = convert_to_capnp(CS_SP)
+    self.sync_personality_from_pcm_follow_distance()
 
     # Update radar tracks from CAN
     RD: structs.RadarDataT | None = self.RI.update(can_list)
