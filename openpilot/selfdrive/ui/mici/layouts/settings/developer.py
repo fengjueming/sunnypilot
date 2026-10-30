@@ -7,6 +7,7 @@ from openpilot.system.ui.lib.application import gui_app
 from openpilot.selfdrive.ui.layouts.settings.common import restart_needed_callback
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.selfdrive.ui.widgets.ssh_key import SshKeyFetcher
+from openpilot.sunnypilot.system.konik_api import is_konik_enabled, set_konik_enabled, swap_dongle_for_konik
 
 
 class AlphaLongConfirmPage(NavScroller):
@@ -23,6 +24,22 @@ class AlphaLongConfirmPage(NavScroller):
       GreyBigButton("", "WARNING: alpha longitudinal control may disable Automatic Emergency Braking (AEB)"),
       GreyBigButton("", "On this car, openpilot defaults to the stock system's built-in ACC."),
       GreyBigButton("", "Enabling this will switch to openpilot longitudinal control."),
+      accept,
+    ])
+
+
+class KonikRebootConfirmPage(NavScroller):
+  def __init__(self, enable: bool, on_confirm: Callable[[], None]):
+    super().__init__()
+
+    accept = BigConfirmationCircleButton("reboot now",
+                                         gui_app.texture("icons_mici/setup/driver_monitoring/dm_check.png", 64, 64),
+                                         lambda: self.dismiss(on_confirm))
+
+    self._scroller.add_widgets([
+      GreyBigButton("use konik api" if enable else "use comma api", "scroll to continue",
+                    gui_app.texture("icons_mici/setup/warning.png", 64, 64)),
+      GreyBigButton("", "Reboot required for changes to take effect."),
       accept,
     ])
 
@@ -85,6 +102,9 @@ class DeveloperLayoutMici(NavScroller):
                                                     "Braking (AEB).")
     self._navigation_toggle = BigParamControl("navigation (alpha)", "NavigationEnabled",
                                               description="Turn-by-turn navigation with a route map. Set a destination from comma connect.")
+    self._konik_toggle = BigToggle("use konik api", initial_state=is_konik_enabled(),
+                                   toggle_callback=self._on_konik_toggled,
+                                   description="Use Konik's API (stable.konik.ai) rather than comma's. Requires reboot.")
     self._debug_mode_toggle = BigParamControl("ui debug mode", "ShowDebugInfo",
                                               toggle_callback=lambda checked: (gui_app.set_show_touches(checked), gui_app.set_show_fps(checked)),
                                               description="Show touch locations and the UI frame rate.")
@@ -99,6 +119,7 @@ class DeveloperLayoutMici(NavScroller):
       self._alpha_long_toggle,
       self._debug_mode_toggle,
       self._navigation_toggle,
+      self._konik_toggle,
     ])
 
     # Toggle lists
@@ -112,7 +133,7 @@ class DeveloperLayoutMici(NavScroller):
       ("ShowDebugInfo", self._debug_mode_toggle),
       ("NavigationEnabled", self._navigation_toggle),
     )
-    onroad_blocked_toggles = (self._adb_toggle, self._joystick_toggle)
+    onroad_blocked_toggles = (self._adb_toggle, self._joystick_toggle, self._konik_toggle)
     release_blocked_toggles = (self._joystick_toggle, self._long_maneuver_toggle, self._lat_maneuver_toggle, self._alpha_long_toggle, self._navigation_toggle)
     engaged_blocked_toggles = (self._long_maneuver_toggle, self._lat_maneuver_toggle, self._alpha_long_toggle)
 
@@ -166,6 +187,7 @@ class DeveloperLayoutMici(NavScroller):
     # Refresh toggles from params to mirror external changes
     for key, item in self._refresh_toggles:
       item.set_checked(ui_state.params.get_bool(key))
+    self._konik_toggle.set_checked(is_konik_enabled())
 
   def _on_joystick_debug_mode(self, state: bool):
     ui_state.params.put_bool("JoystickDebugMode", state, block=True)
@@ -189,6 +211,16 @@ class DeveloperLayoutMici(NavScroller):
     ui_state.params.put_bool("LongitudinalManeuverMode", False, block=True)
     self._long_maneuver_toggle.set_checked(False)
     restart_needed_callback()
+
+  def _on_konik_toggled(self, state: bool):
+    def do_toggle():
+      set_konik_enabled(state)
+      swap_dongle_for_konik(state, ui_state.params)
+      ui_state.params.put_bool("DoReboot", True, block=True)
+
+    # Don't show the new state until the reboot is confirmed
+    self._konik_toggle.set_checked(not state)
+    gui_app.push_widget(KonikRebootConfirmPage(state, do_toggle))
 
   def _on_alpha_long_enabled(self, state: bool):
     def do_toggle(_state: bool):

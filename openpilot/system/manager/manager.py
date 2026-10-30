@@ -6,6 +6,10 @@ import sys
 import time
 import traceback
 
+# Must run before importing anything that reads API_HOST / ATHENA_HOST (e.g. registration below)
+from openpilot.sunnypilot.system.konik_api import apply_konik_env
+apply_konik_env()
+
 from openpilot.cereal import log
 import openpilot.cereal.messaging as messaging
 from openpilot.common.utils import atomic_write
