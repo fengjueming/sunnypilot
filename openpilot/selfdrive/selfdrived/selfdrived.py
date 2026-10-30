@@ -144,6 +144,7 @@ class SelfdriveD:
       max(log.LongitudinalPersonality.schema.enumerants.values()),
       self.params
     )
+    self.personality_prev = self.personality
     self.recalibrating_seen = False
     self.dm_lockout_set = False
     self.dm_uncertain_alerted = False
@@ -511,12 +512,17 @@ class SelfdriveD:
     if CS.gearShifter == car.CarState.GearShifter.park and self.mads.enabled:
       self.events.remove(EventName.canBusMissing)
 
+    # Announce personality changes made outside selfdrived (e.g. synced from the dashboard follow distance)
+    if self.CP.openpilotLongitudinalControl and self.personality != self.personality_prev:
+      self.events.add(EventName.personalityChanged)
+
     # Decrement personality on distance button press
     if self.CP.openpilotLongitudinalControl:
       if any(not be.pressed and be.type == ButtonType.gapAdjustCruise for be in CS.buttonEvents):
         self.personality = (self.personality - 1) % 3
         self.params.put('LongitudinalPersonality', self.personality)
         self.events.add(EventName.personalityChanged)
+    self.personality_prev = self.personality
 
     self.icbm.run(CS, self.sm['carControl'], self.sm['longitudinalPlanSP'], self.is_metric)
 
