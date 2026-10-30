@@ -7,6 +7,7 @@ from openpilot.common.basedir import BASEDIR
 from openpilot.common.params import Params
 from openpilot.common.time_helpers import system_time_valid
 from openpilot.selfdrive.ui.mici.layouts.settings.device.prime import PrimeScroller
+from openpilot.sunnypilot.system.konik_api import get_pairing_backend_name, get_pairing_host
 from openpilot.system.ui.widgets.scroller import NavRawScrollPanel, NavScroller
 from openpilot.selfdrive.ui.mici.widgets.info import InfoLayoutMici
 from openpilot.selfdrive.ui.mici.widgets.button import BigButton, BigCircleButton
@@ -103,7 +104,7 @@ class PairBigButton(BigButton):
     self._comma_icon = gui_app.texture("icons_mici/settings/comma_icon.png", 33, 60)
     self._provider_icons = {provider: gui_app.texture(f"icons_mici/settings/device/paired_{provider}.png", 64, 64)
                            for provider in ("github", "google", "apple")}
-    super().__init__("pair to connect", "connect.comma.ai", self._comma_icon)
+    super().__init__("pair to connect", get_pairing_host(), self._comma_icon)
 
   def _update_state(self):
     super()._update_state()
@@ -120,7 +121,7 @@ class PairBigButton(BigButton):
     else:
       self.set_icon(self._comma_icon)
       self.set_text("pair to connect")
-      self.set_value("connect.comma.ai")
+      self.set_value(get_pairing_host())
 
   def _draw_subtitle(self, rect: rl.Rectangle):
     if self._show_commacare:
@@ -137,7 +138,7 @@ class PairBigButton(BigButton):
     if not system_time_valid():
       dlg = BigDialog("", tr("Please connect to Wi-Fi to complete initial pairing."))
     elif UNREGISTERED_DONGLE_ID == (ui_state.params.get("DongleId") or UNREGISTERED_DONGLE_ID):
-      dlg = BigDialog("", tr("Device must be registered with the comma.ai backend to pair."))
+      dlg = BigDialog("", tr(f"Device must be registered with the {get_pairing_backend_name()} backend to pair."))
     else:
       dlg = PrimeScroller()
     gui_app.push_widget(dlg)
