@@ -22,7 +22,7 @@ def is_registered_device() -> bool:
   return dongle not in (None, UNREGISTERED_DONGLE_ID)
 
 
-def register(show_spinner=False) -> str | None:
+def register(show_spinner=False, register_konik=False) -> str | None:
   """
   All devices built since March 2024 come with all
   info stored in /persist/. This is kept around
@@ -34,8 +34,9 @@ def register(show_spinner=False) -> str | None:
   """
   params = Params()
 
-  dongle_id: str | None = params.get("DongleId")
-  if dongle_id is None and Path(Paths.persist_root()+"/comma/dongle_id").is_file():
+  # register_konik skips the existing / persisted (comma) dongle id to get a new one from Konik
+  dongle_id: str | None = None if register_konik else params.get("DongleId")
+  if dongle_id is None and not register_konik and Path(Paths.persist_root()+"/comma/dongle_id").is_file():
     # not all devices will have this; added early in comma 3X production (2/28/24)
     with open(Paths.persist_root()+"/comma/dongle_id") as f:
       dongle_id = f.read().strip()
@@ -98,7 +99,7 @@ def register(show_spinner=False) -> str | None:
     if show_spinner:
       spinner.close()
 
-  if dongle_id:
+  if dongle_id and not register_konik:
     params.put("DongleId", dongle_id, block=True)
     set_offroad_alert("Offroad_UnregisteredHardware", (dongle_id == UNREGISTERED_DONGLE_ID) and not PC)
   return dongle_id
