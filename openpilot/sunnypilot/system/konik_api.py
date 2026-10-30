@@ -37,6 +37,19 @@ def apply_konik_env() -> None:
   _reset_pairing_cache_on_backend_change("konik" if konik else "comma")
 
 
+def konik_active() -> bool:
+  """Whether this process talks to Konik, i.e. the backend applied at boot rather than the toggle's pending state."""
+  return os.getenv("API_HOST", "").rstrip("/") == KONIK_API_HOST
+
+
+def get_pairing_host() -> str:
+  return "stable.konik.ai" if konik_active() else "connect.comma.ai"
+
+
+def get_pairing_backend_name() -> str:
+  return "Konik" if konik_active() else "comma.ai"
+
+
 def _reset_pairing_cache_on_backend_change(backend: str) -> None:
   # The UI caches the old backend's pairing state and only replaces it on a successful fetch, so drop it
   if _read("LastBackend") == backend:

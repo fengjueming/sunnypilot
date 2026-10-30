@@ -10,6 +10,7 @@ from openpilot.selfdrive.ui.mici.widgets.qr import QR
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.widgets.scroller import NavScroller
+from openpilot.sunnypilot.system.konik_api import get_pairing_host
 
 
 class PairingInfoLayout(InfoLayoutMici):
@@ -124,7 +125,7 @@ class PrimeScroller(NavScroller):
       self._scroller.scroll_indicator_start_after = self._qr
       self._scroller.add_widgets([
         self._qr,
-        GreyBigButton("finish setup", "scan QR code or visit connect.comma.ai",
+        GreyBigButton("finish setup", f"scan QR code or visit {get_pairing_host()}",
                       gui_app.texture("icons_mici/settings/device/green_settings.png", 64, 64)),
         GreyBigButton("", "connect lets you review recent driving footage and bookmark events."),
       ])
@@ -136,7 +137,7 @@ class PrimeScroller(NavScroller):
     except Exception as e:
       cloudlog.warning(f"Failed to get pairing token: {e}")
       token = ""
-    return f"https://connect.comma.ai/?pair={token}"
+    return f"https://{get_pairing_host()}/?pair={token}"
 
   def _update_layout_rects(self):
     super()._update_layout_rects()
