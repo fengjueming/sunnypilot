@@ -195,7 +195,10 @@ class Car:
 
     # openpilot presses the distance button itself to bring the bars in line with the personality.
     # Ignore bar changes while it does (and for 1s after), or the intermediate bars would be written back.
-    if getattr(self.CI.CC, "distance_button", 0):
+    # The RAV4 Prime ignores openpilot's presses, so every bar change there comes from the driver.
+    if self.CP.carFingerprint == "TOYOTA_RAV4_PRIME":
+      self.op_distance_press_frames = 0
+    elif getattr(self.CI.CC, "distance_button", 0):
       self.op_distance_press_frames = 100
     elif self.op_distance_press_frames > 0:
       self.op_distance_press_frames -= 1
