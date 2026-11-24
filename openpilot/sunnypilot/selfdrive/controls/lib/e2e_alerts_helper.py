@@ -15,6 +15,7 @@ from openpilot.sunnypilot.selfdrive.selfdrived.events import EventsSP
 GREEN_LIGHT_X_THRESHOLD = 30
 LEAD_DEPART_DIST_THRESHOLD = 1.0
 TRIGGER_TIMER_THRESHOLD = 0.3
+GREEN_LIGHT_TRIGGER_TIMER_THRESHOLD = 1.0  # longer than the lead depart, the model path alone is noisier
 
 
 class E2EStates:
@@ -81,7 +82,7 @@ class E2EAlertsHelper:
       else:
         self.green_light_trigger_timer = 0
 
-      if self.green_light_trigger_timer * DT_MDL > TRIGGER_TIMER_THRESHOLD:
+      if self.green_light_trigger_timer * DT_MDL > GREEN_LIGHT_TRIGGER_TIMER_THRESHOLD:
         green_light_trigger = True
     elif self.green_light_state != E2EStates.ARMED:
       self.green_light_trigger_timer = 0
